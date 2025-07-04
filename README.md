@@ -1,25 +1,24 @@
-# Decentralized Indexing Protocol
-
-A robust blockchain-based protocol for distributed data indexing built with Clarity smart contracts on the Stacks blockchain.
+# Decentralized Indexing Protocol (DIP) v3.0
 
 ## Overview
 
-The Decentralized Indexing Protocol (DIP) provides a scalable solution for managing and querying distributed data indexes across a network of nodes. This protocol implements sharded data storage, distributed query processing, and an incentivized node participation system.
+The Decentralized Indexing Protocol (DIP) provides a scalable solution for managing and querying distributed data indexes across a network of nodes. This protocol implements sharded data storage, distributed query processing, and an incentivized node participation system with performance-based rewards.
 
 ## Features
 
 ### Core Features
-- **Sharded Data Storage**: Optimized data distribution across network nodes
-- **Time-Range Based Indexing**: Efficient temporal data organization
-- **Stake-Based Node Participation**: Economic incentives for node operators
-- **Configurable Storage Parameters**: Flexible sharding and redundancy settings
-- **Query Processing System**: Distributed query handling capabilities
+- **Sharded Data Storage**: Optimized data distribution across network nodes with dedicated shard management
+- **Stake-Based Node Participation**: Economic incentives for node operators with minimum stake requirements
+- **Query Processing System**: Fee-based distributed query handling with automatic reward distribution
+- **Performance Monitoring**: Real-time node performance tracking and scoring
+- **Reward System**: Automatic reward calculation and distribution to active nodes
 
-### Enhanced Features (Phase 2)
-- **Advanced Sharding Management**: Dedicated shard creation and tracking
-- **Performance Scoring**: Node performance monitoring and tracking
-- **Enhanced Query Processing**: Configurable operation support and complexity management
-- **Improved Storage Configuration**: Customizable replication strategies and consistency levels
+### Enhanced Features (Phase 3)
+- **Compact Architecture**: Streamlined contract design focusing on essential features
+- **Advanced Node Management**: Comprehensive node registration and lifecycle management
+- **Fee-Based Query Processing**: Configurable query fees with complexity-based pricing
+- **Real-Time Rewards**: Immediate reward distribution upon query completion
+- **Administrative Controls**: Owner-controlled node management and performance updates
 
 ## Technical Architecture
 
@@ -27,81 +26,81 @@ The Decentralized Indexing Protocol (DIP) provides a scalable solution for manag
 
 1. **IndexNodes**
    - Node identification and management
-   - Data type specification
-   - Time range assignment
-   - Storage location tracking
    - Query endpoint registration
-   - Stake management
-   - Performance scoring
-   - Shard assignment tracking
+   - Stake management and validation
+   - Performance scoring (0-100 scale)
+   - Query processing statistics
+   - Reward tracking and distribution
+   - Active/inactive status management
 
 2. **Shards**
-   - Size tracking
-   - Node assignments
+   - Node assignment tracking (up to 3 nodes per shard)
    - Data type specification
-   - Time range management
-   - Sealing status
+   - Query volume monitoring
+   - Sealing status management
 
-3. **Storage Configuration**
-   - Shard size configuration
-   - Redundancy factor settings
-   - Compression options
-   - Replication strategy
-   - Consistency level management
+3. **Query Processing**
+   - Fee-based query execution
+   - Automatic reward distribution
+   - Query record tracking
+   - Performance impact monitoring
 
-4. **Query Processors**
-   - Operation support tracking
-   - Complexity management
-   - Timeout configuration
-
-## Error Handling
-
-### Error Codes
-- ERR_UNAUTHORIZED (u100): Unauthorized access attempt
-- ERR_INVALID_DATA (u101): Invalid data provided
-- ERR_INSUFFICIENT_STAKE (u102): Stake amount below minimum
-- ERR_INVALID_SHARD (u103): Invalid shard operation
-- ERR_NODE_NOT_FOUND (u104): Node not found in system
-
-### Validation Checks
-- Time range validation
-- Storage configuration validation
-- Node existence verification
-- Shard availability checking
-- Stake requirement verification
+4. **Reward System**
+   - Pending rewards accumulation
+   - Claim mechanism for node operators
+   - Total earnings tracking
+   - Performance-based reward adjustment
 
 ## Smart Contract Interface
 
 ### Principal Functions
 
+#### Node Management
 ```clarity
-;; Node Registration
-(define-public (register-node-v2 
+;; Register a new indexing node
+(define-public (register-node 
     (node-id uint) 
-    (data-type (string-ascii 64))
-    (start-time uint)
-    (end-time uint)
-    (storage-location (string-ascii 256))
     (query-endpoint (string-ascii 256))
     (stake-amount uint))
 )
 
-;; Shard Management
+;; Deactivate a node (admin only)
+(define-public (deactivate-node (node-id uint))
+)
+
+;; Update node performance score (admin only)
+(define-public (update-performance (node-id uint) (new-score uint))
+)
+```
+
+#### Shard Management
+```clarity
+;; Create a new data shard
 (define-public (create-shard 
     (shard-id uint)
     (data-type (string-ascii 64))
-    (time-range-start uint)
-    (time-range-end uint))
+    (node-assignments (list 3 uint)))
+)
+```
+
+#### Query Processing
+```clarity
+;; Execute a query with fee payment
+(define-public (execute-query
+    (query-id uint)
+    (node-id uint)
+    (fee-amount uint))
 )
 
-;; Storage Configuration
-(define-public (configure-storage-v2
-    (config-id uint)
-    (shard-size uint)
-    (redundancy-factor uint)
-    (compression-enabled bool)
-    (replication-strategy (string-ascii 32))
-    (consistency-level uint))
+;; Calculate query fee based on complexity
+(define-read-only (calculate-query-fee (complexity uint))
+)
+```
+
+#### Reward Management
+```clarity
+;; Claim accumulated rewards
+(define-public (claim-rewards (node-id uint))
 )
 ```
 
@@ -154,10 +153,62 @@ The Decentralized Indexing Protocol (DIP) provides a scalable solution for manag
 
 | Parameter | Description | Default Value | Valid Range |
 |-----------|-------------|---------------|-------------|
-| Shard Size | Size of each data shard | 1000 records | > 0 |
-| Redundancy Factor | Number of replica copies | 3 | ≥ 1 |
-| Minimum Stake | Required stake amount | 1000 STX | ≥ 1000 |
-| Consistency Level | Required consistency level | 2 | ≤ Redundancy Factor |
+| MIN_STAKE_AMOUNT | Minimum required stake for node registration | 1000 | ≥ 1000 |
+| BASE_QUERY_FEE | Base fee for query execution | 10 | > 0 |
+| Performance Score | Node performance rating | 100 (initial) | 0-100 |
+| Shard Node Limit | Maximum nodes per shard | 3 | Fixed |
+
+## Error Handling
+
+### Error Codes
+- **ERR_UNAUTHORIZED (u100)**: Unauthorized access attempt
+- **ERR_INVALID_DATA (u101)**: Invalid data provided
+- **ERR_INSUFFICIENT_STAKE (u102)**: Stake amount below minimum requirement
+- **ERR_NODE_NOT_FOUND (u104)**: Specified node does not exist
+- **ERR_INSUFFICIENT_BALANCE (u105)**: Insufficient balance for operation
+
+### Validation Checks
+- Minimum stake requirement validation
+- Node existence verification
+- Fee amount validation
+- Performance score bounds checking
+- Active node status verification
+
+## Usage Examples
+
+### 1. Register a Node
+```clarity
+(contract-call? .decentralized-indexing-protocol register-node 
+    u1 
+    "https://api.mynode.com/query" 
+    u1500)
+```
+
+### 2. Create a Shard
+```clarity
+(contract-call? .decentralized-indexing-protocol create-shard 
+    u1 
+    "web-pages" 
+    (list u1 u2 u3))
+```
+
+### 3. Execute a Query
+```clarity
+(contract-call? .decentralized-indexing-protocol execute-query 
+    u1001 
+    u1 
+    u15)
+```
+
+### 4. Claim Rewards
+```clarity
+(contract-call? .decentralized-indexing-protocol claim-rewards u1)
+```
+
+### 5. Check Node Information
+```clarity
+(contract-call? .decentralized-indexing-protocol get-node-info u1)
+```
 
 ## Testing
 
@@ -171,6 +222,14 @@ clarinet test tests/unit/*
 clarinet test tests/integration/*
 ```
 
+### Test Coverage Areas
+- Node registration with various stake amounts
+- Query execution with valid and invalid fees
+- Reward claiming and distribution
+- Performance score updates
+- Administrative functions
+- Error handling scenarios
+
 ## Project Roadmap
 
 ### Phase 1 (Completed)
@@ -178,13 +237,19 @@ clarinet test tests/integration/*
 - Node registration system
 - Simple sharding implementation
 
-### Phase 2 (Current)
+### Phase 2 (Completed)
 - Advanced sharding system with dedicated management
 - Performance-based node scoring
 - Enhanced query processing infrastructure
 - Improved storage configuration with replication strategies
-- Comprehensive error handling and validation
-- Debug and optimization improvements
+
+### Phase 3 (Current - Compact Version)
+- Streamlined contract architecture
+- Essential features focus
+- Fee-based query processing
+- Real-time reward distribution
+- Administrative controls
+- Performance monitoring
 
 ### Future Phases
 - Advanced incentive mechanisms
@@ -192,29 +257,40 @@ clarinet test tests/integration/*
 - Dynamic node rebalancing
 - Enhanced security features
 - Advanced data validation
+- Multi-chain support
 
 ## Debugging and Troubleshooting
 
 ### Common Issues
-1. Node Registration Failures
-   - Verify stake amount meets minimum requirement
+
+1. **Node Registration Failures**
+   - Verify stake amount meets minimum requirement (≥ 1000)
    - Ensure unique node ID
-   - Check time range validity
+   - Check query endpoint format
 
-2. Shard Creation Issues
-   - Verify shard ID uniqueness
-   - Check time range parameters
-   - Ensure proper data type specification
+2. **Query Execution Errors**
+   - Verify node exists and is active
+   - Check fee amount meets minimum requirement
+   - Ensure node ID is valid
 
-3. Query Processing Errors
-   - Verify node existence
-   - Check operation support
-   - Monitor timeout configurations
+3. **Reward Claiming Issues**
+   - Verify node has pending rewards
+   - Check node ownership
+   - Ensure node is registered
 
-### Logging and Monitoring
-- Contract events for major operations
-- Performance metrics tracking
-- Error tracking and reporting
+### Monitoring and Analytics
+- Track total nodes and queries via `get-protocol-stats`
+- Monitor node performance scores
+- Track reward distributions
+- Analyze query patterns
+
+## Security Considerations
+
+- **Admin Controls**: Only contract owner can create shards and manage node performance
+- **Stake Requirements**: Minimum stake ensures node commitment
+- **Fee Validation**: Automatic fee verification prevents underpayment
+- **Performance Tracking**: Ongoing monitoring enables quality control
+- **Reward Protection**: Secure reward distribution mechanism
 
 ## Contributing
 
@@ -229,7 +305,28 @@ clarinet test tests/integration/*
 - Include comprehensive tests
 - Update documentation
 - Add proper error handling
+- Maintain backward compatibility
+
+## API Reference
+
+### Read-Only Functions
+
+| Function | Description | Parameters | Returns |
+|----------|-------------|------------|---------|
+| `get-node-info` | Retrieve node information | `node-id` | Node details or none |
+| `get-shard-info` | Get shard information | `shard-id` | Shard details or none |
+| `get-query-record` | Fetch query record | `query-id` | Query details or none |
+| `get-node-rewards` | Check node rewards | `node-id` | Reward information or none |
+| `get-protocol-stats` | Get protocol statistics | None | Total nodes/queries/status |
+| `calculate-query-fee` | Calculate query fee | `complexity` | Calculated fee amount |
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+**Version:** 3.0 (Compact)  
+**Network:** Stacks Blockchain  
+**Language:** Clarity  
+**Contract Owner:** Raoshwill99
