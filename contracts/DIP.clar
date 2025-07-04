@@ -1,215 +1,271 @@
-;; Decentralized Indexing Protocol - Phase 2 (Debugged)
-;; Version 2.0 - Enhanced Sharding and Query Processing
+;; Decentralized Indexing Protocol - Phase 3 (Compact)
+;; Version 3.0 - Essential Features Only
 
 ;; Constants
 (define-constant CONTRACT_OWNER tx-sender)
 (define-constant ERR_UNAUTHORIZED (err u100))
 (define-constant ERR_INVALID_DATA (err u101))
 (define-constant ERR_INSUFFICIENT_STAKE (err u102))
-(define-constant ERR_INVALID_SHARD (err u103))
 (define-constant ERR_NODE_NOT_FOUND (err u104))
+(define-constant ERR_INSUFFICIENT_BALANCE (err u105))
+
 (define-constant MIN_STAKE_AMOUNT u1000)
+(define-constant BASE_QUERY_FEE u10)
 
 ;; Data Variables
 (define-data-var protocol-enabled bool true)
-(define-data-var total-shards uint u0)
 (define-data-var total-nodes uint u0)
+(define-data-var total-queries uint u0)
 
-;; Define buffer types for lists
-(define-data-var empty-uint-list (list 10 uint) (list ))
-(define-data-var empty-string-list (list 5 (string-ascii 32)) (list ))
-
-;; Enhanced Data Types
+;; Core Data Maps
 (define-map IndexNodes
     { node-id: uint }
     {
-        data-type: (string-ascii 64),
-        start-time: uint,
-        end-time: uint,
-        storage-location: (string-ascii 256),
-        query-endpoint: (string-ascii 256),
         stake-amount: uint,
-        is-active: bool,
+        query-endpoint: (string-ascii 256),
         performance-score: uint,
-        assigned-shards: (list 10 uint)
+        is-active: bool,
+        total-queries-processed: uint,
+        total-rewards-earned: uint
     }
 )
 
 (define-map Shards
     { shard-id: uint }
     {
-        size: uint,
         node-assignments: (list 3 uint),
         data-type: (string-ascii 64),
-        time-range-start: uint,
-        time-range-end: uint,
+        total-queries: uint,
         is-sealed: bool
     }
 )
 
-;; Enhanced Storage Configuration
-(define-map StorageConfigs
-    { config-id: uint }
+(define-map QueryRecords
+    { query-id: uint }
     {
-        shard-size: uint,
-        redundancy-factor: uint,
-        compression-enabled: bool,
-        replication-strategy: (string-ascii 32),
-        consistency-level: uint
-    }
-)
-
-;; New Query Processing Structure
-(define-map QueryProcessors
-    { processor-id: uint }
-    {
+        requester: principal,
         node-id: uint,
-        supported-ops: (list 5 (string-ascii 32)),
-        max-complexity: uint,
-        timeout: uint
+        fee-paid: uint,
+        timestamp: uint,
+        success: bool
     }
 )
 
-;; Shard Management
-(define-public (create-shard 
-    (shard-id uint)
-    (data-type (string-ascii 64))
-    (time-range-start uint)
-    (time-range-end uint))
-    (let
-        (
-            (empty-nodes (list ))
-        )
-        (begin
-            (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
-            (asserts! (validate-time-range time-range-start time-range-end) ERR_INVALID_DATA)
-            (asserts! (is-none (get-shard-info shard-id)) ERR_INVALID_SHARD)
-            
-            (map-set Shards
-                { shard-id: shard-id }
-                {
-                    size: u0,
-                    node-assignments: empty-nodes,
-                    data-type: data-type,
-                    time-range-start: time-range-start,
-                    time-range-end: time-range-end,
-                    is-sealed: false
-                }
-            )
-            (var-set total-shards (+ (var-get total-shards) u1))
-            (ok true)
-        )
-    )
+(define-map NodeRewards
+    { node-id: uint }
+    {
+        total-earned: uint,
+        pending-rewards: uint,
+        last-claim: uint
+    }
 )
 
-;; Enhanced Node Registration
-(define-public (register-node-v2 
+;; Node Registration
+(define-public (register-node 
     (node-id uint) 
-    (data-type (string-ascii 64))
-    (start-time uint)
-    (end-time uint)
-    (storage-location (string-ascii 256))
     (query-endpoint (string-ascii 256))
     (stake-amount uint))
     (begin
         (asserts! (>= stake-amount MIN_STAKE_AMOUNT) ERR_INSUFFICIENT_STAKE)
-        (asserts! (validate-time-range start-time end-time) ERR_INVALID_DATA)
-        (asserts! (is-none (get-node-info node-id)) ERR_INVALID_DATA)
+        (asserts! (is-none (map-get? IndexNodes { node-id: node-id })) ERR_INVALID_DATA)
         
         (map-set IndexNodes
             { node-id: node-id }
             {
-                data-type: data-type,
-                start-time: start-time,
-                end-time: end-time,
-                storage-location: storage-location,
-                query-endpoint: query-endpoint,
                 stake-amount: stake-amount,
-                is-active: true,
+                query-endpoint: query-endpoint,
                 performance-score: u100,
-                assigned-shards: (var-get empty-uint-list)
+                is-active: true,
+                total-queries-processed: u0,
+                total-rewards-earned: u0
             }
         )
+        
+        (map-set NodeRewards
+            { node-id: node-id }
+            {
+                total-earned: u0,
+                pending-rewards: u0,
+                last-claim: u0
+            }
+        )
+        
         (var-set total-nodes (+ (var-get total-nodes) u1))
         (ok true)
     )
 )
 
-;; Advanced Query Processing
-(define-public (register-query-processor 
-    (processor-id uint)
+;; Create Shard
+(define-public (create-shard 
+    (shard-id uint)
+    (data-type (string-ascii 64))
+    (node-assignments (list 3 uint)))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
+        (asserts! (is-none (map-get? Shards { shard-id: shard-id })) ERR_INVALID_DATA)
+        
+        (map-set Shards
+            { shard-id: shard-id }
+            {
+                node-assignments: node-assignments,
+                data-type: data-type,
+                total-queries: u0,
+                is-sealed: false
+            }
+        )
+        (ok true)
+    )
+)
+
+;; Execute Query with Fee
+(define-public (execute-query
+    (query-id uint)
     (node-id uint)
-    (max-complexity uint)
-    (timeout uint))
-    (begin
-        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
-        (asserts! (node-exists node-id) ERR_NODE_NOT_FOUND)
-        
-        (map-set QueryProcessors
-            { processor-id: processor-id }
-            {
-                node-id: node-id,
-                supported-ops: (var-get empty-string-list),
-                max-complexity: max-complexity,
-                timeout: timeout
-            }
+    (fee-amount uint))
+    (let
+        (
+            (node-info (unwrap! (map-get? IndexNodes { node-id: node-id }) ERR_NODE_NOT_FOUND))
+            (calculated-fee BASE_QUERY_FEE)
         )
-        (ok true)
+        (begin
+            (asserts! (get is-active node-info) ERR_INVALID_DATA)
+            (asserts! (>= fee-amount calculated-fee) ERR_INSUFFICIENT_BALANCE)
+            
+            ;; Record query
+            (map-set QueryRecords
+                { query-id: query-id }
+                {
+                    requester: tx-sender,
+                    node-id: node-id,
+                    fee-paid: fee-amount,
+                    timestamp: block-height,
+                    success: true
+                }
+            )
+            
+            ;; Update node stats
+            (map-set IndexNodes
+                { node-id: node-id }
+                (merge node-info { 
+                    total-queries-processed: (+ (get total-queries-processed node-info) u1)
+                })
+            )
+            
+            ;; Add to pending rewards
+            (let
+                (
+                    (reward-info (unwrap! (map-get? NodeRewards { node-id: node-id }) ERR_NODE_NOT_FOUND))
+                )
+                (map-set NodeRewards
+                    { node-id: node-id }
+                    (merge reward-info { 
+                        pending-rewards: (+ (get pending-rewards reward-info) fee-amount)
+                    })
+                )
+            )
+            
+            (var-set total-queries (+ (var-get total-queries) u1))
+            (ok query-id)
+        )
     )
 )
 
-;; Enhanced Storage Configuration
-(define-public (configure-storage-v2
-    (config-id uint)
-    (shard-size uint)
-    (redundancy-factor uint)
-    (compression-enabled bool)
-    (replication-strategy (string-ascii 32))
-    (consistency-level uint))
-    (begin
-        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
-        (asserts! (validate-storage-config shard-size redundancy-factor consistency-level) ERR_INVALID_DATA)
-        
-        (map-set StorageConfigs
-            { config-id: config-id }
-            {
-                shard-size: shard-size,
-                redundancy-factor: redundancy-factor,
-                compression-enabled: compression-enabled,
-                replication-strategy: replication-strategy,
-                consistency-level: consistency-level
-            }
+;; Claim Rewards
+(define-public (claim-rewards (node-id uint))
+    (let
+        (
+            (node-info (unwrap! (map-get? IndexNodes { node-id: node-id }) ERR_NODE_NOT_FOUND))
+            (reward-info (unwrap! (map-get? NodeRewards { node-id: node-id }) ERR_NODE_NOT_FOUND))
+            (pending (get pending-rewards reward-info))
         )
-        (ok true)
+        (begin
+            (asserts! (> pending u0) ERR_INSUFFICIENT_BALANCE)
+            
+            ;; Update rewards
+            (map-set NodeRewards
+                { node-id: node-id }
+                (merge reward-info { 
+                    total-earned: (+ (get total-earned reward-info) pending),
+                    pending-rewards: u0,
+                    last-claim: block-height
+                })
+            )
+            
+            ;; Update node total
+            (map-set IndexNodes
+                { node-id: node-id }
+                (merge node-info { 
+                    total-rewards-earned: (+ (get total-rewards-earned node-info) pending)
+                })
+            )
+            
+            (ok pending)
+        )
     )
 )
 
-;; Helper Functions
-(define-private (validate-time-range (start uint) (end uint))
-    (and (> end start) (> start u0))
+;; Update Performance Score
+(define-public (update-performance (node-id uint) (new-score uint))
+    (let
+        (
+            (node-info (unwrap! (map-get? IndexNodes { node-id: node-id }) ERR_NODE_NOT_FOUND))
+        )
+        (begin
+            (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
+            (asserts! (<= new-score u100) ERR_INVALID_DATA)
+            
+            (map-set IndexNodes
+                { node-id: node-id }
+                (merge node-info { performance-score: new-score })
+            )
+            (ok true)
+        )
+    )
 )
 
-(define-private (node-exists (node-id uint))
-    (is-some (get-node-info node-id))
-)
-
-(define-private (validate-storage-config (shard-size uint) (redundancy-factor uint) (consistency-level uint))
-    (and 
-        (> shard-size u0)
-        (>= redundancy-factor u1)
-        (<= consistency-level redundancy-factor)
+;; Deactivate Node
+(define-public (deactivate-node (node-id uint))
+    (let
+        (
+            (node-info (unwrap! (map-get? IndexNodes { node-id: node-id }) ERR_NODE_NOT_FOUND))
+        )
+        (begin
+            (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
+            
+            (map-set IndexNodes
+                { node-id: node-id }
+                (merge node-info { is-active: false })
+            )
+            (ok true)
+        )
     )
 )
 
 ;; Read-Only Functions
-(define-read-only (get-shard-info (shard-id uint))
-    (map-get? Shards { shard-id: shard-id })
-)
-
 (define-read-only (get-node-info (node-id uint))
     (map-get? IndexNodes { node-id: node-id })
 )
 
-(define-read-only (get-processor-info (processor-id uint))
-    (map-get? QueryProcessors { processor-id: processor-id })
+(define-read-only (get-shard-info (shard-id uint))
+    (map-get? Shards { shard-id: shard-id })
+)
+
+(define-read-only (get-query-record (query-id uint))
+    (map-get? QueryRecords { query-id: query-id })
+)
+
+(define-read-only (get-node-rewards (node-id uint))
+    (map-get? NodeRewards { node-id: node-id })
+)
+
+(define-read-only (get-protocol-stats)
+    {
+        total-nodes: (var-get total-nodes),
+        total-queries: (var-get total-queries),
+        protocol-enabled: (var-get protocol-enabled)
+    }
+)
+
+(define-read-only (calculate-query-fee (complexity uint))
+    (+ BASE_QUERY_FEE (* complexity u2))
 )
